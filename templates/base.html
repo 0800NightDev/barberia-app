@@ -17,12 +17,10 @@
     
     <div class="barber-doodles"></div>
     <header class="site-header">
-        <div class="brand-block" style="position: relative; display: inline-block;">
-            <button id="brand-menu-btn" class="glass-circle-btn"
-                style="border: none; font-size: 1.35rem; font-weight: bold; padding: 12px 24px; display: flex; align-items: center; gap: 0.4rem;">Barbería
-                <span style="font-size: 0.7em; margin-top:0.2em; opacity: 0.7;">▾</span></button>
-            <div id="brand-dropdown"
-                style="display: none; position: absolute; top: calc(100% + 0.8rem); left: 0; background: var(--glass-bg, rgba(255,255,255,0.8)); backdrop-filter: var(--glass-filter, blur(20px)); -webkit-backdrop-filter: var(--glass-filter, blur(20px)); box-shadow: var(--glass-inset), 0 10px 25px rgba(0,0,0,0.15); border-radius: 20px; overflow: hidden; z-index: 50; min-width: 220px; border: var(--glass-border);">
+        <div class="brand-block">
+            <button id="brand-menu-btn" class="glass-circle-btn brand-menu-btn">Barbería
+                <span style="font-size: 0.7em; margin-top:0.2em; opacity: 0.7;">&nbsp;▾</span></button>
+            <div id="brand-dropdown" class="brand-dropdown">
                 {% if session.get('is_admin') %}
                 <a href="{{ url_for('admin_dashboard') }}"
                     style="display: block; padding: 1rem 1.25rem; color: var(--text-main, #1e293b); text-decoration: none; border-bottom: 1px solid var(--line-soft, #e2e8f0); font-weight: 600;">Administración</a>

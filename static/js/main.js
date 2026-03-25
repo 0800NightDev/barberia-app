@@ -191,7 +191,11 @@
             initialView: 'dayGridMonth',
             locale: 'es',
             height: 'auto',
-            headerToolbar: {
+            headerToolbar: window.innerWidth < 768 ? {
+                left: 'prev,next',
+                center: 'title',
+                right: 'today'
+            } : {
                 left: 'prev,next today',
                 center: 'title',
                 right: 'dayGridMonth,timeGridWeek,timeGridDay',

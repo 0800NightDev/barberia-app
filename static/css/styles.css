@@ -144,10 +144,46 @@ body::after {
     gap: 12px;
 }
 
-.header-actions {
+.team-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem;
+}
+
+.employee-rating-clickable {
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.2s;
+    min-width: 200px;
+    max-width: 250px;
+    flex: 1 1 200px;
+}
+
+.brand-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.8rem);
+    left: 0;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-filter);
+    -webkit-backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-liquid-shine);
+    border-radius: 20px;
+    overflow: hidden;
+    z-index: 50;
+    min-width: 220px;
+    border: var(--glass-border);
+}
+
+.brand-menu-btn {
+    border: none;
+    font-size: 1.35rem;
+    font-weight: bold;
+    padding: 12px 24px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.4rem;
 }
 
 .nav-link {
@@ -1370,35 +1406,34 @@ html[data-theme="dark"] .prices-card td:nth-child(4) {
         gap: 4px;
     }
 
-    .nav-link {
-        font-size: 0.78rem;
-        padding: 6px 9px;
+    .site-header {
+        flex-direction: column;
+        padding: 12px 10px;
+        align-items: center;
+        text-align: center;
+        gap: 10px;
     }
 
-    /* Body font a bit smaller */
-    body {
-        font-size: 14px;
+    .brand-block {
+        justify-items: center;
     }
 
-    /* Container */
-    .container {
-        margin: 12px auto;
-        padding: 0 8px;
+    .site-header nav {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
     }
 
-    /* Cards: tighter padding, smaller radius */
-    .card {
-        padding: 16px 12px;
-        border-radius: 16px;
-    }
-
-    .hero {
-        padding: 18px 12px;
-        border-radius: 20px;
+    .header-actions {
+        width: 100%;
+        justify-content: center;
+        margin-top: 4px;
     }
 
     .hero h2 {
-        font-size: 1.4rem;
+        font-size: 1.35rem;
+        line-height: 1.25;
     }
 
     /* Section badge */
@@ -1407,7 +1442,7 @@ html[data-theme="dark"] .prices-card td:nth-child(4) {
         padding: 4px 9px;
     }
 
-    /* Metrics: stack all cards in one column for very small screens */
+    /* Metrics: stack all cards in one column */
     .metrics-grid {
         flex-direction: column;
         align-items: stretch;
@@ -1422,29 +1457,20 @@ html[data-theme="dark"] .prices-card td:nth-child(4) {
     /* Tables fully scrollable */
     .table-wrapper {
         border-radius: 12px;
+        overflow-x: auto;
     }
 
     table {
-        min-width: 520px;
+        min-width: 500px; /* Reduced for phone */
         font-size: 13px;
     }
 
     th, td {
-        padding: 8px 8px;
+        padding: 8px 6px;
     }
 
     /* Filters: full width single column */
     .filters-grid {
-        grid-template-columns: 1fr;
-    }
-
-    /* Employee items */
-    .employee-item {
-        padding: 10px;
-    }
-
-    /* Service edit form: full single column */
-    .service-edit-form {
         grid-template-columns: 1fr;
     }
 
@@ -1455,45 +1481,87 @@ html[data-theme="dark"] .prices-card td:nth-child(4) {
         width: 100%;
         text-align: center;
         justify-content: center;
+        padding: 12px; /* Tappable area */
     }
 
-    /* Exception: theme toggle and tiny action buttons */
+    /* Exception: theme toggle and circle icons */
     .theme-toggle,
-    .glass-circle-btn {
-        width: auto !important;
+    .glass-circle-btn,
+    #theme-toggle {
+        width: 44px !important;
+        height: 44px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     /* Inline actions stack */
     .inline-actions {
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
     }
 
-    /* Payment page: reduce font sizes */
-    .payment-amount-card .amount-bcv {
-        font-size: 1.4rem;
-    }
-
-    .payment-timer-value {
-        font-size: 1.5rem;
-    }
-
-    /* Calendar */
+    /* Calendar Mobile Fixes */
     #admin-calendar {
-        min-height: 320px;
+        min-height: 300px;
+    }
+    .fc .fc-toolbar {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .fc .fc-toolbar-title {
+        font-size: 1.1rem !important;
+    }
+    .fc .fc-button {
+        padding: 6px 8px !important;
+        font-size: 12px !important;
+    }
+    .fc .fc-view-harness {
+        height: 350px !important;
     }
 
-    /* Chart height */
-    .chart-card {
-        height: 180px;
-    }
-
-    /* Cancel modal: full-screen feel */
+    /* Cancel modal: full-width fix */
     #cancel-reason-modal .card {
-        width: 95%;
-        padding: 16px 12px;
+        width: 92% !important;
+        max-width: 360px;
+        padding: 18px 14px;
+        margin: 10px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* Liquid Glass Performance (Mobile-specific simplification) */
+    .hero::before, .card::before {
+        backdrop-filter: blur(2px) !important; /* Lighter blur for speed */
+        filter: none !important; /* Disable heavy SVG filters on mobile */
+    }
+    /* Team grid mobile fixes */
+    .team-grid {
+        gap: 1rem;
+    }
+    .employee-rating-clickable {
+        min-width: 140px;
+        max-width: 180px;
+        flex: 1 1 140px;
+        padding: 12px 8px;
+    }
+    .employee-rating-clickable h4 {
+        font-size: 1rem !important;
+    }
+    .employee-rating-clickable img, .employee-rating-clickable div {
+        width: 3.5rem !important;
+        height: 3.5rem !important;
+    }
+
+    /* Dropdown mobile alignment */
+    .brand-dropdown {
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 90vw !important;
+        max-width: 300px !important;
     }
 }
+
 
 
 

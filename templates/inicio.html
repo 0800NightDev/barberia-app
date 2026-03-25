@@ -14,10 +14,9 @@
         <p>Haz clic en un miembro para calificar tu última experiencia.</p>
     </div>
 
-    <div class="team-grid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem;">
+    <div class="team-grid">
         {% for emp in employee_ratings %}
-        <article class="info-card employee-rating-clickable" data-employee-id="{{ emp.id }}"
-            style="cursor: pointer; text-align: center; transition: transform 0.2s; min-width: 200px; max-width: 250px; flex: 1 1 200px;">
+        <article class="info-card employee-rating-clickable" data-employee-id="{{ emp.id }}">
             <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;">
                 {% if emp.photo_path %}
                     <img src="{{ emp.photo_path }}" alt="{{ emp.name }}" style="width: 4rem; height: 4rem; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color, rgba(37, 99, 235, 0.45));">
