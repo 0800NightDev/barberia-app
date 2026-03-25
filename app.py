@@ -127,8 +127,9 @@ def _validar_fecha_agendamiento(date_str: str):
     if selected_date < current_date:
         return False, "No puedes agendar citas en fechas pasadas."
 
-    if selected_date.year != current_date.year:
-        return False, "Solo puedes agendar citas dentro del año actual."
+    limit_date = current_date + timedelta(days=30)
+    if selected_date > limit_date:
+        return False, "Solo puedes agendar citas con un máximo de 30 días de anticipación."
 
     return True, ""
 

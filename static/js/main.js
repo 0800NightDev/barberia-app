@@ -109,11 +109,20 @@
                     return;
                 }
 
+                const formatTime12h = (time24) => {
+                    if (!time24) return "";
+                    const [h, m] = time24.split(":");
+                    const hour = parseInt(h, 10);
+                    const ampm = hour >= 12 ? "PM" : "AM";
+                    const h12 = hour % 12 || 12;
+                    return `${h12}:${m} ${ampm}`;
+                };
+
                 timeSelect.innerHTML = '<option value="">Selecciona horario...</option>';
                 data.slots.forEach((slot) => {
                     const option = document.createElement('option');
                     option.value = slot;
-                    option.textContent = slot;
+                    option.textContent = formatTime12h(slot);
                     timeSelect.appendChild(option);
                 });
             } catch {
@@ -137,9 +146,8 @@
         }
 
         const now = new Date();
-        const currentYear = now.getFullYear();
-        const minDate = new Date(currentYear, now.getMonth(), now.getDate());
-        const maxDate = new Date(currentYear, 11, 31);
+        const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
         const toDateLocal = (value) => {
             const pad = (n) => String(n).padStart(2, '0');
             return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
@@ -218,10 +226,19 @@
                     failureCallback(error);
                 }
             },
-            eventTimeFormat: {
-                hour: '2-digit',
+            validRange: {
+                start: new Date().getFullYear().toString() + '-01-01'
+            },
+            slotLabelFormat: {
+                hour: 'numeric',
                 minute: '2-digit',
-                meridiem: false,
+                omitZeroMinute: false,
+                meridiem: 'short'
+            },
+            eventTimeFormat: {
+                hour: 'numeric',
+                minute: '2-digit',
+                meridiem: 'short'
             },
             eventClick: ({ event }) => {
                 const { client_name, client_email, status } = event.extendedProps;

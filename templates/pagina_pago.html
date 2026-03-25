@@ -121,9 +121,21 @@
 
         <label>
             Fecha y hora de la transferencia
-            <div style="display: flex; gap: 0.5rem; width: 100%;">
-                <input type="date" name="payment_date" id="payment_date" max="{{ payment_datetime_max[:10] }}" required style="flex: 1; min-width: 0;">
-                <input type="time" name="payment_time" id="payment_time" required style="flex: 1; min-width: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
+                <input type="date" name="payment_date" id="payment_date" max="{{ payment_datetime_max[:10] }}" required>
+                <div style="display: flex; gap: 0.4rem; width: 100%;">
+                    <select id="pay_h" required style="flex: 1; min-width: 0; padding: 11px 4px; font-size: 0.9rem;">
+                        {% for i in range(1, 13) %}<option value="{{ '%02d'|format(i) }}">{{ i }}</option>{% endfor %}
+                    </select>
+                    <select id="pay_m" required style="flex: 1; min-width: 0; padding: 11px 4px; font-size: 0.9rem;">
+                        {% for i in range(0, 60) %}<option value="{{ '%02d'|format(i) }}">{{ '%02d'|format(i) }}</option>{% endfor %}
+                    </select>
+                    <select id="pay_p" required style="flex: 1; min-width: 0; padding: 11px 4px; font-size: 0.9rem;">
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                    </select>
+                </div>
+                <input type="hidden" name="payment_time" id="payment_time_hidden">
             </div>
         </label>
 
@@ -145,6 +157,20 @@
         const noBtn = document.getElementById('cancel-modal-no-btn');
         const yesBtn = document.getElementById('cancel-modal-yes-btn');
         const appointmentId = {{ appointment.id }};
+        const hS = document.getElementById('pay_h');
+        const mS = document.getElementById('pay_m');
+        const pS = document.getElementById('pay_p');
+        const hI = document.getElementById('payment_time_hidden');
+
+        function updateH() {
+            let h = parseInt(hS.value);
+            const p = pS.value;
+            if (p === 'PM' && h < 12) h += 12;
+            if (p === 'AM' && h === 12) h = 0;
+            hI.value = `${String(h).padStart(2, '0')}:${mS.value}`;
+        }
+        [hS, mS, pS].forEach(s => s.addEventListener('change', updateH));
+        updateH();
 
         function openModal() { modal.style.display = 'flex'; }
         function closeModal() { modal.style.display = 'none'; }
