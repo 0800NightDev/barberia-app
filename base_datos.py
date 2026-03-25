@@ -62,6 +62,8 @@ if _raw_db_url.startswith("postgres://"):
 
 if _raw_db_url:
     _db_url = _raw_db_url
+    if "sslmode=" not in _db_url:
+        _db_url += ("&" if "?" in _db_url else "?") + "sslmode=require"
     engine = create_engine(_db_url, future=True)
 else:
     _db_url = f"sqlite:///{DB_PATH.resolve().as_posix()}"

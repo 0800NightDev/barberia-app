@@ -78,6 +78,13 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+# ── App Initialization ─────────────────────────────────────────────────────
+# We run these outside of __main__ so they execute when Gunicorn imports
+# the app object on Render.com.
+with app.app_context():
+    init_db()
+    start_scheduler()
+
 COLORES_EMPLEADOS = {
     "Ana": "#8b5cf6",
     "Carlos": "#0ea5e9",
@@ -1209,6 +1216,4 @@ def rate_limit_exceeded(_error):
 
 
 if __name__ == "__main__":
-    init_db()
-    start_scheduler()
     app.run(debug=True)
