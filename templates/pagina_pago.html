@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% block title %}Registrar pago{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <span class="section-badge">Pago móvil</span>
+    <h2>Completa el pago para confirmar tu cita</h2>
+    
+</section>
+
+<!-- Modal de Confirmación de Cancelación -->
+<div id="cancel-confirm-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(var(--tint-color), 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 90%; max-width: 420px; margin: 0; position: relative;">
+        <button id="cancel-modal-close-btn"
+            style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-soft);">&#x2715;</button>
+        <div class="section-heading compact" style="text-align:center;">
+            <h3>⚠️ Cancelar cita</h3>
+            <p>¿Estás seguro de que deseas cancelar esta reserva? Esta acción es irreversible y el horario quedará libre.</p>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <button id="cancel-modal-no-btn" style="flex: 1;">No, mantener cita</button>
+            <button id="cancel-modal-yes-btn" class="button-danger" style="flex: 1;">Sí, cancelar</button>
+        </div>
+    </div>
+</div>
+
+<section class="card">
+    <div class="section-heading compact">
+        <h3>Datos para realizar el pago</h3>
+        
+    </div>
+
+    <div class="payment-timer-card" id="payment-timer" data-remaining-seconds="{{ payment_remaining_seconds }}" data-expired-redirect-url="{{ url_for('payment_page', appointment_id=appointment.id) }}">
+        <h4>Tiempo restante para completar el pago</h4>
+        <p class="payment-timer-value" id="payment-countdown">--:--</p>
+        <small>Dispones de {{ payment_pending_minutes }} minutos desde la creación de la reserva. Si el tiempo termina, la cita se libera automáticamente y deberás reservar de nuevo.</small>
+    </div>
+
+    <div class="info-grid">
+        <article class="info-card">
+            <h4>Banco receptor</h4>
+            <p>{{ payment_receiver.bank }}</p>
+        </article>
+        <article class="info-card">
+            <h4>Teléfono receptor</h4>
+            <p>{{ payment_receiver.phone }}</p>
+        </article>
+        <article class="info-card">
+            <h4>Cédula / RIF</h4>
+            <p>{{ payment_receiver.id }}</p>
+        </article>
+        <article class="info-card">
+            <h4>Titular</h4>
+            <p>{{ payment_receiver.name }}</p>
+        </article>
+        <article class="info-card">
+            <h4>Referencia sugerida</h4>
+            <p>{{ payment_receiver.reference }}</p>
+        </article>
+        <article class="info-card payment-amount-card">
+            <h4>Monto a transferir</h4>
+            <p class="amount-usd">USD ${{ '%.2f'|format(payment_amount_usd) }}</p>
+            <p class="amount-bcv">Bs {{ '%.2f'|format(payment_amount_bcv) }}</p>
+            <small>Tasa Oficial BCV aplicada: Bs {{ '%.2f'|format(bcv_usd_rate) }} por $1</small>
+        </article>
+        <article class="info-card">
+            <h4>Cita</h4>
+            <p>{{ appointment.service_name }} con {{ appointment.employee_name }} - {{ appointment.appointment_datetime }}</p>
+        </article>
+    </div>
+
+    <div class="section-heading compact section-heading-spaced">
+        <h3>Registrar comprobante</h3>
+        
+    </div>
+
+    <form action="{{ url_for('payment_submit', appointment_id=appointment.id) }}" method="post" class="form-grid" id="payment-proof-form">
+        <label>
+            Últimos 4 dígitos
+            <input type="text" name="payment_last4" minlength="4" maxlength="4" pattern="\d{4}" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'').slice(0,4);" required>
+        </label>
+
+        <label>
+            Banco emisor
+            <select name="payment_bank" required>
+                <option value="">Selecciona un banco...</option>
+                {% for bank in bancos_venezolanos %}
+                    <option value="{{ bank }}">{{ bancos_venezolanos_codigos[bank] }} - {{ bank }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            Teléfono emisor
+            <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <select name="payment_phone_prefix" required style="flex: 0 0 35%; min-width: 0; padding-left: 0.5rem; padding-right: 0.5rem;">
+                    <option value="">Prefijo</option>
+                    <option value="0414">0414</option>
+                    <option value="0424">0424</option>
+                    <option value="0412">0412</option>
+                    <option value="0422">0422</option>
+                    <option value="0416">0416</option>
+                    <option value="0426">0426</option>
+                </select>
+                <input type="text" name="payment_phone_digits" maxlength="7" minlength="7" inputmode="numeric" pattern="\d{7}" oninput="this.value=this.value.replace(/\D/g,'').slice(0,7);" placeholder="1234567" title="Ingresa 7 dígitos numéricos" required style="flex: 1; min-width: 0;">
+            </div>
+        </label>
+
+        <label>
+            Cédula emisor
+            <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <select name="payment_payer_id_prefix" required style="flex: 0 0 25%; min-width: 0; padding-left: 0.5rem; padding-right: 0.5rem;">
+                    <option value="V">V</option>
+                    <option value="E">E</option>
+                </select>
+                <input type="text" name="payment_payer_id_digits" maxlength="8" pattern="\d{1,8}" oninput="this.value=this.value.replace(/\D/g,'').slice(0,8);" placeholder="12345678" title="Ingresa hasta 8 dígitos numéricos" required style="flex: 1; min-width: 0;">
+            </div>
+        </label>
+
+        <label>
+            Fecha y hora de la transferencia
+            <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <input type="date" name="payment_date" id="payment_date" max="{{ payment_datetime_max[:10] }}" required style="flex: 1; min-width: 0;">
+                <input type="time" name="payment_time" id="payment_time" required style="flex: 1; min-width: 0;">
+            </div>
+        </label>
+
+        <div class="payment-submit-wrapper">
+            <button type="submit" id="payment-submit-button">Enviar comprobante</button>
+        </div>
+    </form>
+
+    <div style="margin-top: 1.5rem; text-align: center;">
+        <button id="open-cancel-modal-btn" class="button-danger" style="background: none; border: 1px solid rgba(220,38,38,0.4); color: #ef4444;">Cancelar cita</button>
+    </div>
+</section>
+
+<script>
+    (function() {
+        const modal = document.getElementById('cancel-confirm-modal');
+        const openBtn = document.getElementById('open-cancel-modal-btn');
+        const closeBtn = document.getElementById('cancel-modal-close-btn');
+        const noBtn = document.getElementById('cancel-modal-no-btn');
+        const yesBtn = document.getElementById('cancel-modal-yes-btn');
+        const appointmentId = {{ appointment.id }};
+
+        function openModal() { modal.style.display = 'flex'; }
+        function closeModal() { modal.style.display = 'none'; }
+
+        openBtn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        noBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+        yesBtn.addEventListener('click', async () => {
+            yesBtn.textContent = 'Cancelando...';
+            yesBtn.disabled = true;
+            try {
+                const res = await fetch(`/appointment/${appointmentId}/cancel`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = '/';
+                } else {
+                    alert(data.error || 'Error al cancelar.');
+                    yesBtn.textContent = 'Sí, cancelar';
+                    yesBtn.disabled = false;
+                    closeModal();
+                }
+            } catch {
+                alert('Error de conexión.');
+                yesBtn.textContent = 'Sí, cancelar';
+                yesBtn.disabled = false;
+                closeModal();
+            }
+        });
+    })();
+</script>
+{% endblock %}

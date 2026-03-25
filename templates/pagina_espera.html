@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}Esperando confirmación{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <span class="section-badge">Pago enviado</span>
+    <h2>Esperando confirmación del administrador</h2>
+</section>
+
+<section class="card" style="text-align: center; max-width: 540px; margin: 0 auto;">
+
+    <!-- Estado: esperando -->
+    <div id="state-waiting">
+        <!-- Tres puntos animados -->
+        <div class="bounce-dots" aria-label="Esperando confirmación">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="section-heading compact" style="text-align:center; margin-top: 1.25rem;">
+            <h3 style="margin-bottom: 0.5rem;">Comprobante recibido</h3>
+            <p style="color: var(--text-soft);">Tu comprobante fue enviado correctamente. El administrador revisará el pago y confirmará tu cita.</p>
+        </div>
+
+        <div class="info-grid" style="margin: 1.5rem 0;">
+            <article class="info-card">
+                <h4>Servicio</h4>
+                <p>{{ appointment.service_name }}</p>
+            </article>
+            <article class="info-card">
+                <h4>Profesional</h4>
+                <p>{{ appointment.employee_name }}</p>
+            </article>
+            <article class="info-card" style="grid-column: 1 / -1;">
+                <h4>Fecha y hora</h4>
+                <p>{{ appointment.appointment_datetime }}</p>
+            </article>
+        </div>
+
+        <p id="polling-label" style="font-size: 0.9rem; color: var(--text-soft);">Verificando estado del pago...</p>
+    </div>
+
+    <!-- Estado: confirmado -->
+    <div id="state-confirmed" style="display: none;">
+        <div class="status-icon status-icon--ok" aria-hidden="true">&#10004;</div>
+        <div class="section-heading compact" style="text-align:center; margin-top: 1rem;">
+            <h3 style="color: #22c55e; margin-bottom: 0.5rem;">Pago confirmado</h3>
+            <p>Tu cita ha sido registrada exitosamente. Redirigiendo a la pantalla principal...</p>
+        </div>
+    </div>
+
+    <!-- Estado: cancelado/rechazado -->
+    <div id="state-canceled" style="display: none;">
+        <div class="status-icon status-icon--err" aria-hidden="true">&#10007;</div>
+        <div class="section-heading compact" style="text-align:center; margin-top: 1rem;">
+            <h3 style="color: #ef4444; margin-bottom: 0.5rem;">Pago rechazado</h3>
+            <p>El administrador rechazó el comprobante o la cita fue cancelada. Por favor, intenta reservar nuevamente.</p>
+        </div>
+        <a href="/" class="button" style="display: inline-block; margin-top: 1rem;">Volver al inicio</a>
+    </div>
+</section>
+
+<style>
+/* ── Bouncing dots ──────────────────────────────── */
+.bounce-dots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 1.25rem 0 0.25rem;
+}
+.bounce-dots span {
+    display: block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--primary-color, #2563eb);
+    animation: dot-bounce 1.2s ease-in-out infinite both;
+}
+.bounce-dots span:nth-child(1) { animation-delay: 0s; }
+.bounce-dots span:nth-child(2) { animation-delay: 0.18s; }
+.bounce-dots span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes dot-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.6; }
+    40%            { transform: translateY(-10px); opacity: 1; }
+}
+
+/* ── Status icons ───────────────────────────────── */
+.status-icon {
+    font-size: 2.8rem;
+    line-height: 1;
+    font-weight: 700;
+}
+.status-icon--ok  { color: #22c55e; }
+.status-icon--err { color: #ef4444; }
+</style>
+
+<script>
+(function() {
+    const appointmentId = {{ appointment.id }};
+    const statusUrl = `/payment/${appointmentId}/status`;
+
+    const stateWaiting   = document.getElementById('state-waiting');
+    const stateConfirmed = document.getElementById('state-confirmed');
+    const stateCanceled  = document.getElementById('state-canceled');
+
+    let intervalId = null;
+
+    function transitionTo(state) {
+        stateWaiting.style.display   = 'none';
+        stateConfirmed.style.display = 'none';
+        stateCanceled.style.display  = 'none';
+        const el = document.getElementById('state-' + state);
+        if (el) el.style.display = 'block';
+    }
+
+    async function checkStatus() {
+        try {
+            const res  = await fetch(statusUrl);
+            const data = await res.json();
+
+            if (data.status === 'scheduled') {
+                clearInterval(intervalId);
+                transitionTo('confirmed');
+                setTimeout(() => { window.location.href = '/'; }, 2500);
+            } else if (data.status === 'canceled' || data.status === 'not_found') {
+                clearInterval(intervalId);
+                transitionTo('canceled');
+            }
+        } catch (_) { /* Network error – keep polling silently */ }
+    }
+
+    intervalId = setInterval(checkStatus, 4000);
+    checkStatus();
+})();
+</script>
+{% endblock %}

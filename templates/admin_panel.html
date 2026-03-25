@@ -1,0 +1,503 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard admin{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <span class="section-badge">Administración</span>
+    <h2>Panel de citas</h2>
+    <p>Consulta el calendario y el listado detallado de reservas.</p>
+</section>
+
+<!-- Modal de cancelación con motivo -->
+<div id="cancel-reason-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(var(--tint-color), 0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 90%; max-width: 440px; margin: 0; position: relative;">
+        <button id="crm-close-btn"
+            style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-soft); line-height: 1;">&#x2715;</button>
+        <div class="section-heading compact" style="text-align:center;">
+            <h3>Cancelar cita</h3>
+            <p>Selecciona el motivo de la cancelación para registrarlo correctamente.</p>
+        </div>
+        <form id="cancel-reason-form" method="post" style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+            <input type="hidden" name="status" value="canceled">
+            <input type="hidden" name="filter_date" value="{{ filters.date }}">
+            <input type="hidden" name="filter_employee_id" value="{{ filters.employee_id }}">
+            <input type="hidden" name="filter_status" value="{{ filters.status }}">
+            <!-- Option: Empleado -->
+            <label style="cursor: pointer; padding: 0.75rem; border: 1px solid var(--glass-border); border-radius: 0.75rem; display: block;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <input type="radio" name="cancel_reason" value="employee" required style="flex-shrink: 0; width: 1rem; height: 1rem; cursor: pointer;">
+                    <strong>Cancelado por el empleado</strong>
+                </div>
+                <p style="margin: 0.35rem 0 0 1.6rem; font-size: 0.83rem; color: var(--text-soft);">Se aplicará penalización de puntos al empleado responsable.</p>
+            </label>
+            <!-- Option: Cliente -->
+            <label style="cursor: pointer; padding: 0.75rem; border: 1px solid var(--glass-border); border-radius: 0.75rem; display: block;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <input type="radio" name="cancel_reason" value="client" required style="flex-shrink: 0; width: 1rem; height: 1rem; cursor: pointer;">
+                    <strong>Cancelado por el cliente</strong>
+                </div>
+                <p style="margin: 0.35rem 0 0 1.6rem; font-size: 0.83rem; color: var(--text-soft);">Sin penalización. El horario quedará libre.</p>
+            </label>
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                <button type="button" id="crm-no-btn" style="flex: 1;">Mantener cita</button>
+                <button type="submit" class="button-danger" style="flex: 1;">Confirmar cancelación</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<section class="card">
+    <div class="employee-manager">
+        <div class="employee-manager-header" style="text-align: center;">
+            <h3 style="margin-bottom: 0.5rem; font-size: 1.5rem;">Gestión de empleados</h3>
+            <p style="font-size: 1rem;">Agrega, edita o elimina personal desde este panel.</p>
+        </div>
+
+        <form class="employee-create-form" action="{{ url_for('admin_add_employee') }}" method="post" enctype="multipart/form-data">
+            <label>
+                Nombre
+                <input type="text" name="employee_name" maxlength="16" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*)?" title="Usa solo letras, máximo un espacio y caracteres comunes como apóstrofo o guion." required>
+            </label>
+            <label>
+                Área de Trabajo
+                <select name="work_area" onchange="if(this.value==='Otra'){this.nextElementSibling.style.display='block';this.nextElementSibling.required=true;this.removeAttribute('name');}else{this.nextElementSibling.style.display='none';this.nextElementSibling.required=false;this.setAttribute('name','work_area');}" required>
+                    <option value="General">General</option>
+                    {% for svc in services %}
+                    <option value="{{ svc.name }}">{{ svc.name }}</option>
+                    {% endfor %}
+                    <option value="Otra">Otra...</option>
+                </select>
+                <input type="text" name="work_area" placeholder="Especifique..." style="display:none; margin-top: 0.5rem;" maxlength="30">
+            </label>
+            <label style="max-width: 100px;">
+                Límites (día)
+                <input type="number" name="max_tasks" min="0" value="0" title="0 = sin límite" style="width: 80px;">
+            </label>
+            <label>
+                Foto
+                <input type="file" name="employee_photo" accept="image/*">
+            </label>
+            <button type="submit">Agregar empleado</button>
+        </form>
+
+        <form action="{{ url_for('admin_batch_edit_employees') }}" method="post" id="batch-edit-employees-form" enctype="multipart/form-data">
+            <div class="employee-list">
+                {% for employee in employees %}
+                <div class="employee-item">
+                    <div class="employee-edit-form" style="grid-template-columns: 1fr 1fr 1fr auto;">
+                        <input type="hidden" name="emp_id" value="{{ employee.id }}">
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <input type="text" name="employee_name_{{ employee.id }}" maxlength="16" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*)?" title="Usa solo letras, máximo un espacio y caracteres comunes como apóstrofo o guion." value="{{ employee.name }}" required>
+                            
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                {% if employee.photo_path %}
+                                    <img src="{{ employee.photo_path }}" alt="Foto" style="width: 2.5rem; height: 2.5rem; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                                {% else %}
+                                    <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.2rem;">👤</div>
+                                {% endif %}
+                                <select name="work_area_{{ employee.id }}" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 0.25rem; padding: 0.5rem;" required>
+                                    <option value="General" {% if employee.work_area == 'General' %}selected{% endif %}>General</option>
+                                    {% for svc in services %}
+                                        <option value="{{ svc.name }}" {% if employee.work_area == svc.name %}selected{% endif %}>{{ svc.name }}</option>
+                                    {% endfor %}
+                                    {% if employee.work_area not in ['General'] and employee.work_area not in services|map(attribute='name')|list %}
+                                        <option value="{{ employee.work_area }}" selected>{{ employee.work_area }}</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; justify-content: center; width: 80px;">
+                            <input type="number" name="max_tasks_{{ employee.id }}" min="0" value="{{ employee.max_tasks }}" title="Límite citas/día (0=sin límite)" style="width: 80px;">
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; justify-content: center;">
+                            <input type="file" name="employee_photo_{{ employee.id }}" accept="image/*" style="font-size: 0.8rem; padding: 0.2rem; min-width: 150px;" title="Cambiar foto">
+                            <button type="submit" formaction="{{ url_for('admin_delete_employee', employee_id=employee.id) }}" class="button-danger" onclick="return confirm('¿Eliminar este empleado?');">Eliminar empleado</button>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="employee-empty">No hay empleados registrados.</p>
+                {% endfor %}
+            </div>
+            
+            {% if employees %}
+            <div style="margin-top: 1rem;">
+                <button type="submit" class="button-secondary" style="width: 100%;">Confirmar cambios de todos los empleados</button>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="employee-manager">
+        <div class="employee-manager-header">
+            <h4>Gestión de servicios</h4>
+            <p>Agrega nuevos servicios para que aparezcan en el formulario de reserva.</p>
+        </div>
+
+        <form class="employee-create-form" action="{{ url_for('admin_add_service') }}" method="post">
+            <label>
+                Nombre
+                <input type="text" name="service_name" maxlength="30" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9][A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9()&+.,' -]*" title="Usa letras, números y signos básicos: () & + . , ' -" required>
+            </label>
+            <label>
+                Duración (min)
+                <input type="number" name="service_duration" min="15" max="480" step="1" oninput="this.value=this.value.replace(/\D/g,'').slice(0,3)" required>
+            </label>
+            <label>
+                Precio (USD)
+                <input type="number" name="service_price" min="0.01" max="1000" step="0.01" inputmode="decimal" oninput="const v=this.value.replace(',', '.').replace(/[^\d.]/g,''); const p=v.split('.'); const ent=(p[0]||'').slice(0,4); const dec=(p.slice(1).join('')||'').slice(0,2); this.value=p.length>1 ? `${ent}.${dec}` : ent;" required>
+            </label>
+            <button type="submit">Agregar servicio</button>
+        </form>
+
+        <div class="employee-list">
+            {% for service in services %}
+            <div class="employee-item">
+                <form action="{{ url_for('admin_edit_service', service_id=service.id) }}" method="post"
+                    class="service-edit-form">
+                    <input type="text" name="service_name" maxlength="30" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9][A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9()&+.,' -]*" title="Usa letras, números y signos básicos: () & + . , ' -" value="{{ service.name }}" required>
+                    <input type="number" name="service_duration" min="15" max="480" step="1" oninput="this.value=this.value.replace(/\D/g,'').slice(0,3)"
+                        value="{{ service.duration_minutes }}" required>
+                    <input type="number" name="service_price" min="0.01" step="0.01" inputmode="decimal" oninput="const v=this.value.replace(',', '.').replace(/[^\d.]/g,''); const p=v.split('.'); const ent=(p[0]||'').slice(0,4); const dec=(p.slice(1).join('')||'').slice(0,2); this.value=p.length>1 ? `${ent}.${dec}` : ent;"
+                        max="1000"
+                        value="{{ '%.2f'|format(service.price_usd) }}" required>
+                    <button type="submit" class="button-secondary">Guardar cambios</button>
+                </form>
+                <form action="{{ url_for('admin_delete_service', service_id=service.id) }}" method="post"
+                    class="employee-delete-form" onsubmit="return confirm('¿Eliminar este servicio?');">
+                    <button type="submit" class="button-danger">Eliminar</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="employee-empty">No hay servicios registrados.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="metrics-grid">
+        <article class="metric-card">
+            <h4>Total citas</h4>
+            <p>{{ metrics.total_appointments }}</p>
+        </article>
+        <article class="metric-card">
+            <h4>Servicio más pedido</h4>
+            <p>{{ metrics.most_requested_service }} ({{ metrics.most_requested_count }})</p>
+        </article>
+        <article class="metric-card">
+            <h4>Empleado más solicitado</h4>
+            <p>{{ metrics.top_employee }} ({{ metrics.top_employee_count }})</p>
+        </article>
+        <article class="metric-card">
+            <h4>Estados</h4>
+            <p>P: {{ metrics.status_counts.pending_payment }} | A: {{ metrics.status_counts.scheduled }} | At: {{
+                metrics.status_counts.completed }} | C: {{ metrics.status_counts.canceled }}</p>
+        </article>
+        
+        <article class="metric-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <h4 style="margin-bottom: 1rem; font-size: 1.1rem; font-weight: 500;">Empleado del Mes</h4>
+            {% if employee_ratings %}
+                {% set best = employee_ratings[0] %}
+                <div style="margin-bottom: 0.5rem;">
+                    {% if best.photo_path %}
+                        <img src="{{ best.photo_path }}" alt="{{ best.name }}" style="width: 5rem; height: 5rem; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-color);">
+                    {% else %}
+                        <div style="width: 5rem; height: 5rem; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; border: 3px solid var(--primary-color); margin: 0 auto;">👤</div>
+                    {% endif %}
+                </div>
+                <div style="font-size: 1.6rem; font-weight: bold; margin: 0; line-height: 1.2;">{{ best.name }}</div>
+                <small style="font-size: 0.9rem; color: var(--text-soft); display: block; margin-top: 0.2rem;">{{ best.work_area }}</small>
+            {% else %}
+                <p style="font-size: 1.1rem; color: var(--text-soft);">Sin datos este mes.</p>
+            {% endif %}
+        </article>
+    </div>
+
+    {% if employee_ratings %}
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="section-heading compact">
+            <h3>Ranking de Empleados (Este Mes)</h3>
+            <p>Calificaciones basadas en el feedback de los clientes.</p>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Puesto</th>
+                        <th>Empleado</th>
+                        <th style="text-align: center;">Calificación</th>
+                        <th style="text-align: center;">Total Reseñas</th>
+                        <th>Comentarios Recientes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employee_ratings %}
+                    <tr>
+                        <td style="font-weight: bold; width: 60px;">#{{ loop.index }}</td>
+                        <td>{{ emp.name }}</td>
+                        <td style="text-align: center; color: var(--primary-color); font-weight: bold;">{{ emp.average }} / 5.0</td>
+                        <td style="text-align: center;">{{ emp.total_ratings }}</td>
+                        <td style="font-size: 0.85rem; max-width: 250px;">
+                            {% for c in emp.comments[:2] %}
+                                <div style="margin-bottom: 0.25rem; border-left: 2px solid var(--primary-color); padding-left: 0.5rem;">
+                                    "{{ c.comment }}" <span style="color:#f59e0b;">★{{ c.rating }}</span>
+                                </div>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mini-table-card">
+        <h4>Citas por día</h4>
+        <div class="charts-grid">
+            <div class="chart-card">
+                <canvas id="appointmentsByDayChart" aria-label="Gráfico de citas por día"></canvas>
+            </div>
+            <div class="chart-card chart-card-small">
+                <canvas id="appointmentsStatusChart" aria-label="Gráfico de estado de citas"></canvas>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Cantidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in metrics.appointments_by_day %}
+                    <tr>
+                        <td>{{ row.date }}</td>
+                        <td>{{ row.count }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2">Sin datos para mostrar.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="calendar-card">
+        <h3>Calendario de citas</h3>
+        <div class="calendar-legend" aria-label="Leyenda de colores por empleado">
+            {% for item in leyenda_colores %}
+            <div class="calendar-legend-item">
+                <span class="calendar-legend-dot" style="background-color: {{ item['color'] }};"></span>
+                <span>{{ item['nombre'] }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <div id="admin-calendar" data-events-url="{{ url_for('admin_appointments_api') }}"></div>
+    </div>
+
+    <h3 class="table-title">Listado detallado</h3>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+        <form action="{{ url_for('admin_cleanup_canceled_appointments') }}" method="post"
+            onsubmit="return confirm('¿Seguro que deseas eliminar todas las citas canceladas? Esta acción no se puede deshacer.');"
+            style="margin: 0;">
+            <input type="hidden" name="filter_date" value="{{ filters.date }}">
+            <input type="hidden" name="filter_employee_id" value="{{ filters.employee_id }}">
+            <input type="hidden" name="filter_status" value="{{ filters.status }}">
+            <button type="submit" class="button-danger">Limpiar canceladas</button>
+        </form>
+
+        <form action="{{ url_for('admin_cleanup_completed_appointments') }}" method="post"
+            onsubmit="return confirm('¿Seguro que deseas eliminar todas las citas atendidas? Esta acción no se puede deshacer.');"
+            style="margin: 0;">
+            <input type="hidden" name="filter_date" value="{{ filters.date }}">
+            <input type="hidden" name="filter_employee_id" value="{{ filters.employee_id }}">
+            <input type="hidden" name="filter_status" value="{{ filters.status }}">
+            <button type="submit" class="button-secondary">Limpiar atendidas</button>
+        </form>
+    </div>
+
+    <form class="filters-grid" action="{{ url_for('admin_dashboard') }}" method="get">
+        <label>
+            Fecha
+            <input type="date" name="date" value="{{ filters.date }}">
+        </label>
+        <label>
+            Empleado
+            <select name="employee_id">
+                <option value="">Todos</option>
+                {% for employee in employees %}
+                <option value="{{ employee.id }}" {% if filters.employee_id==employee.id|string %}selected{% endif %}>{{
+                    employee.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Estado
+            <select name="status">
+                <option value="">Todos</option>
+                <option value="pending_payment" {% if filters.status=='pending_payment' %}selected{% endif %}>Pendiente
+                    pago</option>
+                <option value="pending_instore" {% if filters.status=='pending_instore' %}selected{% endif %}>Por atender y pagar</option>
+                <option value="scheduled" {% if filters.status=='scheduled' %}selected{% endif %}>Agendada</option>
+                <option value="completed" {% if filters.status=='completed' %}selected{% endif %}>Atendida</option>
+                <option value="canceled" {% if filters.status=='canceled' %}selected{% endif %}>Cancelada</option>
+            </select>
+        </label>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha y hora</th>
+                    <th>Cliente</th>
+                    <th>Email</th>
+                    <th>Servicio</th>
+                    <th>Tipo</th>
+                    <th>Empleado</th>
+                    <th>Estado</th>
+                    <th>Pago</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in appointments %}
+                <tr>
+                    <td>{{ item.appointment_datetime }}</td>
+                    <td>{{ item.client_name }}</td>
+                    <td>{{ item.client_email }}</td>
+                    <td>{{ item.service_name }} ({{ item.service_duration }} min)</td>
+                    <td>
+                        <span class="service-type-badge {% if item.service_type == 'Domicilio' %}service-type-domicilio{% else %}service-type-local{% endif %}">
+                            {{ item.service_type or 'Local' }}
+                        </span>
+                    </td>
+                    <td>{{ item.employee_name }}</td>
+                    <td>
+                        <span class="status-badge {{ item.status }}">
+                            {% if item.status == 'pending_payment' %}
+                            Pendiente pago
+                            {% elif item.status == 'pending_instore' %}
+                            Por atender y pagar
+                            {% elif item.status == 'scheduled' %}
+                            Agendada
+                            {% elif item.status == 'completed' %}
+                            Atendida
+                            {% elif item.status == 'canceled' %}
+                            Cancelada
+                            {% else %}
+                            {{ item.status }}
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if item.payment_last4 %}
+                        <div class="payment-proof">
+                            <small>Ref: ****{{ item.payment_last4 }}</small>
+                            <small>{{ item.payment_bank }} | {{ item.payment_phone }}</small>
+                            <small>{{ item.payment_payer_id }} | {{ item.payment_datetime }}</small>
+                        </div>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.status == 'scheduled' %}
+                        <form action="{{ url_for('admin_update_appointment_status', appointment_id=item.id) }}"
+                            method="post" class="inline-actions">
+                            <input type="hidden" name="filter_date" value="{{ filters.date }}">
+                            <input type="hidden" name="filter_employee_id" value="{{ filters.employee_id }}">
+                            <input type="hidden" name="filter_status" value="{{ filters.status }}">
+                            <button type="submit" name="status" value="completed"
+                                class="button-secondary">Atendida</button>
+                            <button type="button" class="button-danger open-cancel-modal-btn"
+                                data-action-url="{{ url_for('admin_update_appointment_status', appointment_id=item.id) }}"
+                                >Cancelar</button>
+                        </form>
+                        {% elif item.status == 'pending_instore' %}
+                        <form action="{{ url_for('admin_update_appointment_status', appointment_id=item.id) }}"
+                            method="post" class="inline-actions">
+                            <input type="hidden" name="filter_date" value="{{ filters.date }}">
+                            <input type="hidden" name="filter_employee_id" value="{{ filters.employee_id }}">
+                            <input type="hidden" name="filter_status" value="{{ filters.status }}">
+                            <button type="submit" name="status" value="completed"
+                                class="button-secondary">Pagado y atendido</button>
+                            <button type="button" class="button-danger open-cancel-modal-btn"
+                                data-action-url="{{ url_for('admin_update_appointment_status', appointment_id=item.id) }}"
+                                >Cancelar</button>
+                        </form>
+                        {% elif item.status == 'pending_payment' %}
+                        <form action="{{ url_for('admin_review_payment', appointment_id=item.id) }}" method="post"
+                            class="inline-actions">
+                            <input type="hidden" name="filter_date" value="{{ filters.date }}">
+                            <input type="hidden" name="filter_employee_id" value="{{ filters.employee_id }}">
+                            <input type="hidden" name="filter_status" value="{{ filters.status }}">
+                            <button type="submit" name="decision" value="approve" class="button-secondary">Aprobar
+                                pago</button>
+                            <button type="submit" name="decision" value="reject" class="button-danger">Rechazar
+                                pago</button>
+                        </form>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8">No hay citas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script id="appointments-by-day-data" type="application/json">{{ metrics.appointments_by_day | tojson }}</script>
+<script id="appointments-status-data" type="application/json">{{ metrics.status_counts | tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+(function() {
+    const modal    = document.getElementById('cancel-reason-modal');
+    const form     = document.getElementById('cancel-reason-form');
+    const closeBtn = document.getElementById('crm-close-btn');
+    const noBtn    = document.getElementById('crm-no-btn');
+
+    function openModal(actionUrl) {
+        form.action = actionUrl;
+        // Clear previous selection
+        form.querySelectorAll('input[name="cancel_reason"]').forEach(r => r.checked = false);
+        modal.style.display = 'flex';
+    }
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    closeBtn.addEventListener('click', closeModal);
+    noBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.querySelectorAll('.open-cancel-modal-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            openModal(btn.dataset.actionUrl);
+        });
+    });
+})();
+</script>
+{% endblock %}

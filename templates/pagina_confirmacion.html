@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Cita confirmada{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <span class="section-badge">Reserva confirmada</span>
+    <h2>¡Tu cita ha sido registrada!</h2>
+</section>
+
+<section class="card" style="text-align: center; max-width: 540px; margin: 0 auto;">
+    <div style="font-size: 3.5rem; margin-bottom: 1rem;" aria-hidden="true">🏪</div>
+    <div class="section-heading compact" style="text-align:center;">
+        <h3 style="margin-bottom: 0.5rem;">Pago en el local</h3>
+        <p style="color: var(--text-soft);">Tu cita fue registrada exitosamente. El pago se realizará directamente en el local al momento de recibir el servicio.</p>
+    </div>
+
+    <div class="info-grid" style="margin: 1.5rem 0;">
+        <article class="info-card">
+            <h4>Servicio</h4>
+            <p>{{ appointment.service_name }}</p>
+        </article>
+        <article class="info-card">
+            <h4>Profesional</h4>
+            <p>{{ appointment.employee_name }}</p>
+        </article>
+        <article class="info-card">
+            <h4>Fecha y hora</h4>
+            <p>{{ appointment.appointment_datetime }}</p>
+        </article>
+        <article class="info-card">
+            <h4>Tipo de servicio</h4>
+            <p>{{ appointment.service_type or 'Local' }}</p>
+        </article>
+    </div>
+
+    <p style="font-size: 0.9rem; color: var(--text-soft); margin-bottom: 1.5rem;">
+        📧 Recibirás un recordatorio por correo electrónico antes de tu cita.
+    </p>
+
+    <a href="/" class="button" style="display: inline-block;">Volver al inicio</a>
+</section>
+{% endblock %}

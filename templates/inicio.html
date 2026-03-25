@@ -1,0 +1,326 @@
+{% extends 'base.html' %}
+
+{% block title %}Reservar cita{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h2>Reserva tu cita en segundos</h2>
+    <p>Elige servicio, profesional, fecha y horario disponible en tiempo real.</p>
+</section>
+
+<section class="card" style="margin-bottom: 2rem;">
+    <div class="section-heading compact">
+        <h3>Conoce a nuestro equipo</h3>
+        <p>Haz clic en un miembro para calificar tu última experiencia.</p>
+    </div>
+
+    <div class="team-grid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem;">
+        {% for emp in employee_ratings %}
+        <article class="info-card employee-rating-clickable" data-employee-id="{{ emp.id }}"
+            style="cursor: pointer; text-align: center; transition: transform 0.2s; min-width: 200px; max-width: 250px; flex: 1 1 200px;">
+            <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;">
+                {% if emp.photo_path %}
+                    <img src="{{ emp.photo_path }}" alt="{{ emp.name }}" style="width: 4rem; height: 4rem; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color, rgba(37, 99, 235, 0.45));">
+                {% else %}
+                    <div style="width: 4rem; height: 4rem; border-radius: 50%; background: rgba(59, 130, 246, 0.1); display: flex; align-items: center; justify-content: center; font-size: 2rem; border: 2px solid var(--primary-color, rgba(37, 99, 235, 0.45));">👤</div>
+                {% endif %}
+            </div>
+            <h4 style="margin: 0; font-size: 1.25rem;">{{ emp.name }} <small
+                    style="font-size: 0.8rem; color: var(--text-soft); display: block; margin-top: 0.2rem;">{{ emp.work_area
+                    }}</small></h4>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Email Verification Modal -->
+<div id="verify-email-modal"
+    style="display: none; position: fixed; inset: 0; background: rgba(var(--tint-color), 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 90%; max-width: 400px; margin: 0; position: relative;">
+        <button id="close-modal-btn"
+            style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-soft);">&times;</button>
+        <div class="section-heading compact">
+            <h3>Verifica tu identidad</h3>
+            <p>Ingresa el correo electrónico que usaste para agendar tu cita.</p>
+        </div>
+        <form id="verify-email-form">
+            <input type="hidden" id="verify-employee-id" name="employee_id">
+            <label style="display: block; width: 100%;">
+                <input type="email" id="verify-client-email" required placeholder="tu-correo@ejemplo.com"
+                    style="width: 100%; margin-bottom: 1rem;">
+            </label>
+            <button type="submit" style="width: 100%;">Verificar y Calificar</button>
+        </form>
+    </div>
+</div>
+
+<section class="card prices-card">
+    <div class="section-heading compact">
+        <h3>Precios actuales</h3>
+
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Servicio</th>
+                    <th>Duración</th>
+                    <th>Precio (USD)</th>
+                    <th>Precio (Bs - Tasa Oficial)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in price_board %}
+                <tr>
+                    <td>{{ item.service_name }}</td>
+                    <td>{{ item.duration }} min</td>
+                    <td>${{ '%.2f'|format(item.price_usd) }}</td>
+                    <td>Bs {{ '%.2f'|format(item.price_bcv) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-heading">
+        <h3>Formulario de reserva</h3>
+
+    </div>
+
+    <form action="{{ url_for('book') }}" method="post" id="booking-form">
+        <div class="form-grid">
+            <label>
+                Nombre del cliente
+                <input type="text" name="client_name" maxlength="16"
+                    pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*)?"
+                    title="Usa solo letras, máximo un espacio y caracteres comunes como apóstrofo o guion." required>
+            </label>
+
+            <label>
+                Email del cliente
+                <input type="email" name="client_email" maxlength="28" required>
+            </label>
+
+            <label>
+                Tipo de servicio
+                <select name="service_type" id="service_type" required>
+                    <option value="Local">Local (en el negocio)</option>
+                    <option value="Domicilio">Domicilio (a tu dirección)</option>
+                </select>
+            </label>
+
+            <label>
+                Método de pago
+                <select name="payment_method" id="payment_method" required>
+                    <option value="">Selecciona un método...</option>
+                    <option value="Pago Móvil" data-types="Domicilio">Pago Móvil (Domicilio)</option>
+                    <option value="Efectivo" data-types="Local">Efectivo (Local)</option>
+                    <option value="Punto de Venta" data-types="Local">Punto de Venta (Local)</option>
+                </select>
+            </label>
+
+            <label>
+                Servicio
+                <select name="service_name" id="service_name" required>
+                    <option value="">Selecciona...</option>
+                    {% for service in services %}
+                    <option value="{{ service }}">{{ service }} ({{ service_catalog[service] }} min)</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label>
+                Empleado
+                <select name="employee_id" id="employee_id" required>
+                    <option value="">Selecciona...</option>
+                    {% for employee in employees %}
+                    <option value="{{ employee.id }}" data-work-area="{{ employee.work_area }}">{{ employee.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label>
+                Fecha
+                <input type="date" name="date" id="date" required>
+            </label>
+
+            <label>
+                Horario disponible
+                <select name="time" id="time" required>
+                    <option value="">Primero selecciona empleado y fecha</option>
+                </select>
+            </label>
+        </div>
+
+        <button type="submit">Confirmar reserva</button>
+    </form>
+</section>
+
+<section class="info-grid">
+    <article class="info-card">
+        <h4>Disponibilidad actualizada</h4>
+        <p>Los horarios se refrescan automáticamente para evitar choques de reservas.</p>
+    </article>
+    <article class="info-card">
+        <h4>Atención personalizada</h4>
+        <p>Puedes seleccionar al empleado con quien prefieres atenderte.</p>
+    </article>
+    <article class="info-card">
+        <h4>Recordatorio por correo</h4>
+        <p>Recibirás un email antes de la cita.</p>
+    </article>
+</section>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const modal = document.getElementById("verify-email-modal");
+        const closeBtn = document.getElementById("close-modal-btn");
+        const verifyForm = document.getElementById("verify-email-form");
+        const empIdInput = document.getElementById("verify-employee-id");
+        const emailInput = document.getElementById("verify-client-email");
+
+        document.querySelectorAll(".employee-rating-clickable").forEach(card => {
+            card.addEventListener("click", () => {
+                empIdInput.value = card.dataset.employeeId;
+                emailInput.value = "";
+                modal.style.display = "flex";
+            });
+
+            
+            card.addEventListener("mouseenter", () => card.style.transform = "translateY(-5px)");
+            card.addEventListener("mouseleave", () => card.style.transform = "translateY(0)");
+        });
+
+        const serviceTypeSelect = document.getElementById("service_type");
+        const paymentMethodSelect = document.getElementById("payment_method");
+        const serviceSelect = document.getElementById("service_name");
+        const employeeSelect = document.getElementById("employee_id");
+        const allEmployeeOptions = Array.from(employeeSelect.options).slice(1);
+
+        function filterPaymentMethods() {
+            const selectedType = serviceTypeSelect.value;
+            paymentMethodSelect.value = "";
+            Array.from(paymentMethodSelect.options).forEach(opt => {
+                if (!opt.value) return;
+                const allowed = opt.dataset.types;
+                opt.hidden = allowed !== selectedType;
+                opt.disabled = allowed !== selectedType;
+            });
+        }
+
+        serviceTypeSelect.addEventListener("change", () => {
+            filterPaymentMethods();
+            refreshSlots();
+        });
+
+        filterPaymentMethods();
+
+        serviceSelect.addEventListener("change", (e) => {
+            const selectedService = e.target.value;
+            let foundValidEmployee = false;
+
+            allEmployeeOptions.forEach(opt => {
+                const area = opt.getAttribute("data-work-area");
+                if (!selectedService || area === "General" || area === selectedService || area === "Otra") {
+                    opt.hidden = false;
+                    opt.disabled = false;
+                } else {
+                    opt.hidden = true;
+                    opt.disabled = true;
+                    if (opt.selected) opt.selected = false;
+                }
+                if (!opt.disabled && opt.selected) {
+                    foundValidEmployee = true;
+                }
+            });
+
+            if (!foundValidEmployee) {
+                employeeSelect.value = "";
+            }
+            refreshSlots();
+        });
+
+        closeBtn.addEventListener("click", () => modal.style.display = "none");
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) modal.style.display = "none";
+        });
+
+        verifyForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const btn = verifyForm.querySelector("button");
+            const originalText = btn.textContent;
+            btn.textContent = "Verificando...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch("/api/verify-rating-eligibility", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        employee_id: empIdInput.value,
+                        client_email: emailInput.value
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    window.location.href = data.url;
+                } else {
+                    alert(data.error || "Ocurrió un error al verificar.");
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                alert("Error de conexión. Inténtalo de nuevo.");
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        const dateInput = document.getElementById("date");
+        const timeSelect = document.getElementById("time");
+
+        function refreshSlots() {
+            const dateVal = dateInput.value;
+            const empVal = employeeSelect.value;
+            const serviceVal = serviceSelect.value;
+            const stypeVal = serviceTypeSelect.value;
+
+            if (!dateVal || !empVal || !serviceVal) return;
+
+            timeSelect.innerHTML = '<option value="">Cargando...</option>';
+
+            fetch(`/api/availability?date=${dateVal}&employee_id=${empVal}&service_name=${encodeURIComponent(serviceVal)}&service_type=${stypeVal}`)
+                .then(r => r.json())
+                .then(data => {
+                    timeSelect.innerHTML = '';
+                    if (data.slots && data.slots.length > 0) {
+                        timeSelect.innerHTML = '<option value="">Selecciona una hora...</option>';
+                        data.slots.forEach(slot => {
+                            const opt = document.createElement('option');
+                            opt.value = slot;
+                            opt.textContent = slot;
+                            timeSelect.appendChild(opt);
+                        });
+                    } else if (data.error) {
+                        timeSelect.innerHTML = `<option value="">${data.error}</option>`;
+                    } else {
+                        const msg = stypeVal === 'Local' ? 'Sin disponibilidad local para esta fecha' : 'Sin disponibilidad a domicilio para esta fecha';
+                        timeSelect.innerHTML = `<option value="">${msg}</option>`;
+                    }
+                })
+                .catch(() => {
+                    timeSelect.innerHTML = '<option value="">Error al cargar horarios</option>';
+                });
+        }
+
+        dateInput.addEventListener("change", refreshSlots);
+        employeeSelect.addEventListener("change", refreshSlots);
+    });
+</script>
+{% endblock %}
