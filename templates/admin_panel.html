@@ -91,18 +91,18 @@
             <div class="employee-list">
                 {% for employee in employees %}
                 <div class="employee-item">
-                    <div class="employee-edit-form" style="grid-template-columns: 1fr 1fr 1fr auto;">
+                    <div class="employee-edit-form">
                         <input type="hidden" name="emp_id" value="{{ employee.id }}">
-                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div class="employee-name-area">
                             <input type="text" name="employee_name_{{ employee.id }}" maxlength="16" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['’-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*)?" title="Usa solo letras, máximo un espacio y caracteres comunes como apóstrofo o guion." value="{{ employee.name }}" required>
                             
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div class="employee-controls">
                                 {% if employee.photo_path %}
-                                    <img src="{{ employee.photo_path }}" alt="Foto" style="width: 2.5rem; height: 2.5rem; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                                    <img src="{{ employee.photo_path }}" alt="Foto" class="employee-avatar">
                                 {% else %}
-                                    <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.2rem;">👤</div>
+                                    <div class="employee-avatar-placeholder">👤</div>
                                 {% endif %}
-                                <select name="work_area_{{ employee.id }}" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 0.25rem; padding: 0.5rem;" required>
+                                <select name="work_area_{{ employee.id }}" class="employee-work-select" required>
                                     <option value="General" {% if employee.work_area == 'General' %}selected{% endif %}>General</option>
                                     {% for svc in services %}
                                         <option value="{{ svc.name }}" {% if employee.work_area == svc.name %}selected{% endif %}>{{ svc.name }}</option>
@@ -114,12 +114,12 @@
                             </div>
                         </div>
 
-                        <div style="display: flex; flex-direction: column; gap: 0.5rem; justify-content: center; width: 80px;">
-                            <input type="number" name="max_tasks_{{ employee.id }}" min="0" value="{{ employee.max_tasks }}" title="Límite citas/día (0=sin límite)" style="width: 80px;">
+                        <div class="employee-limits-area">
+                            <input type="number" name="max_tasks_{{ employee.id }}" min="0" value="{{ employee.max_tasks }}" title="Límite citas/día (0=sin límite)">
                         </div>
                         
-                        <div style="display: flex; flex-direction: column; gap: 0.5rem; justify-content: center;">
-                            <input type="file" name="employee_photo_{{ employee.id }}" accept="image/*" style="font-size: 0.8rem; padding: 0.2rem; min-width: 150px;" title="Cambiar foto">
+                        <div class="employee-actions-area">
+                            <input type="file" name="employee_photo_{{ employee.id }}" accept="image/*" class="employee-photo-input" title="Cambiar foto">
                             <button type="submit" formaction="{{ url_for('admin_delete_employee', employee_id=employee.id) }}" class="button-danger" onclick="return confirm('¿Eliminar este empleado?');">Eliminar empleado</button>
                         </div>
                     </div>

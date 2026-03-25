@@ -18,8 +18,8 @@
     <div class="barber-doodles"></div>
     <header class="site-header">
         <div class="brand-block">
-            <button id="brand-menu-btn" class="glass-circle-btn brand-menu-btn">Barbería
-                <span style="font-size: 0.7em; margin-top:0.2em; opacity: 0.7;">&nbsp;▾</span></button>
+            <button id="brand-menu-btn" class="brand-menu-btn">Barbería
+                <span class="dropdown-arrow">&nbsp;▾</span></button>
             <div id="brand-dropdown" class="brand-dropdown">
                 {% if session.get('is_admin') %}
                 <a href="{{ url_for('admin_dashboard') }}"
