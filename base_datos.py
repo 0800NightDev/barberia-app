@@ -49,8 +49,25 @@ CREATED_AT_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 Base = declarative_base()
 
-sqlite_url = f"sqlite:///{DB_PATH.resolve().as_posix()}"
-engine = create_engine(sqlite_url, future=True, connect_args={"check_same_thread": False})
+import os
+from sqlalchemy import inspect as sa_inspect
+
+# ── Database URL detection ─────────────────────────────────────────────────
+# Render (and other PaaS) set DATABASE_URL automatically when a Postgres
+# database is attached. Locally we fall back to SQLite.
+_raw_db_url = os.environ.get("DATABASE_URL", "")
+if _raw_db_url.startswith("postgres://"):
+    # SQLAlchemy ≥ 1.4 requires postgresql:// scheme
+    _raw_db_url = _raw_db_url.replace("postgres://", "postgresql://", 1)
+
+if _raw_db_url:
+    _db_url = _raw_db_url
+    engine = create_engine(_db_url, future=True)
+else:
+    _db_url = f"sqlite:///{DB_PATH.resolve().as_posix()}"
+    engine = create_engine(_db_url, future=True, connect_args={"check_same_thread": False})
+
+IS_SQLITE = _db_url.startswith("sqlite")
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
@@ -308,45 +325,50 @@ def _ensure_appointments_service_fk(connection):
 def init_db():
     Base.metadata.create_all(bind=engine)
 
-    with engine.begin() as connection:
-        _ensure_appointments_service_fk(connection)
+    # ── SQLite-only legacy migrations (PRAGMA is SQLite-specific) ──────────
+    # On PostgreSQL the schema is always created fresh by create_all(),
+    # so these migrations are unnecessary.
+    if IS_SQLITE:
+        with engine.begin() as connection:
+            _ensure_appointments_service_fk(connection)
 
-        existing_emp_columns = {
-            row[1] for row in connection.execute(text("PRAGMA table_info(employees)")).fetchall()
-        }
-        if "work_area" not in existing_emp_columns:
-            connection.execute(text("ALTER TABLE employees ADD COLUMN work_area TEXT NOT NULL DEFAULT 'General'"))
-        if "rating_penalty" not in existing_emp_columns:
-            connection.execute(text("ALTER TABLE employees ADD COLUMN rating_penalty FLOAT NOT NULL DEFAULT 0.0"))
-        if "photo_path" not in existing_emp_columns:
-            connection.execute(text("ALTER TABLE employees ADD COLUMN photo_path TEXT DEFAULT NULL"))
-        if "max_tasks" not in existing_emp_columns:
-            connection.execute(text("ALTER TABLE employees ADD COLUMN max_tasks INTEGER NOT NULL DEFAULT 0"))
+            existing_emp_columns = {
+                row[1] for row in connection.execute(text("PRAGMA table_info(employees)")).fetchall()
+            }
+            if "work_area" not in existing_emp_columns:
+                connection.execute(text("ALTER TABLE employees ADD COLUMN work_area TEXT NOT NULL DEFAULT 'General'"))
+            if "rating_penalty" not in existing_emp_columns:
+                connection.execute(text("ALTER TABLE employees ADD COLUMN rating_penalty FLOAT NOT NULL DEFAULT 0.0"))
+            if "photo_path" not in existing_emp_columns:
+                connection.execute(text("ALTER TABLE employees ADD COLUMN photo_path TEXT DEFAULT NULL"))
+            if "max_tasks" not in existing_emp_columns:
+                connection.execute(text("ALTER TABLE employees ADD COLUMN max_tasks INTEGER NOT NULL DEFAULT 0"))
 
-        existing_columns = {
-            row[1]
-            for row in connection.execute(text("PRAGMA table_info(appointments)")).fetchall()
-        }
+            existing_columns = {
+                row[1]
+                for row in connection.execute(text("PRAGMA table_info(appointments)")).fetchall()
+            }
 
-        extra_columns = {
-            "payment_last4": "TEXT",
-            "payment_bank": "TEXT",
-            "payment_phone": "TEXT",
-            "payment_payer_id": "TEXT",
-            "payment_datetime": "TEXT",
-            "payment_submitted_at": "TEXT",
-            "rating": "INTEGER",
-            "rating_comment": "TEXT",
-            "rating_token": "TEXT UNIQUE",
-            "service_type": "TEXT DEFAULT 'Local'",
-            "payment_method": "TEXT",
-            "cancel_reason": "TEXT",
-        }
+            extra_columns = {
+                "payment_last4": "TEXT",
+                "payment_bank": "TEXT",
+                "payment_phone": "TEXT",
+                "payment_payer_id": "TEXT",
+                "payment_datetime": "TEXT",
+                "payment_submitted_at": "TEXT",
+                "rating": "INTEGER",
+                "rating_comment": "TEXT",
+                "rating_token": "TEXT UNIQUE",
+                "service_type": "TEXT DEFAULT 'Local'",
+                "payment_method": "TEXT",
+                "cancel_reason": "TEXT",
+            }
 
-        for column_name, column_type in extra_columns.items():
-            if column_name not in existing_columns:
-                connection.execute(text(f"ALTER TABLE appointments ADD COLUMN {column_name} {column_type}"))
+            for column_name, column_type in extra_columns.items():
+                if column_name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE appointments ADD COLUMN {column_name} {column_type}"))
 
+    # ── Seed initial data (runs on both SQLite and PostgreSQL) ─────────────
     with get_session() as session:
         existing_employees = session.query(Employee).count()
         if existing_employees == 0:
